@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 
 const productsRouter = require("./routes/products");
 const ordersRouter = require("./routes/orders");
@@ -9,10 +10,12 @@ const adminRouter = require("./routes/admin");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// middleware, который разбирает тело запроса из JSON в обычный JS-объект
+app.use(cors());
+
+// middleware, который разбирает тело запроса из JSON в обычный JS-объект (req.body)
 app.use(express.json());
 
-// роут для проверки, что сервер жив
+// простой роут для проверки, что сервер жив
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });

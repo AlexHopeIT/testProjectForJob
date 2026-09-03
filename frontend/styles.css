@@ -1,4 +1,4 @@
-/* БАЗА */
+/* RESET / БАЗА */
 * {
   margin: 0;
   padding: 0;
@@ -26,6 +26,7 @@ button {
   border: none;
   background: none;
 }
+
 .header,
 .banner,
 .services,
@@ -38,7 +39,7 @@ button {
 
 /* ШАПКА */
 .header {
-  position: relative; /* нужно, чтобы выпадающее меню каталога позиционировалось относительно шапки */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -232,7 +233,7 @@ button {
   display: flex;
   gap: 14px;
   padding: 20px 0;
-  overflow-x: auto;
+  overflow-x: auto; /* если не влезают - будет горизонтальный скролл, а не перенос */
 }
 
 .service {
@@ -244,7 +245,7 @@ button {
   gap: 6px;
   padding: 8px;
   border-radius: 12px;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease; /* пункт 4 интерактива: плавное выделение */
 }
 
 .service:hover {

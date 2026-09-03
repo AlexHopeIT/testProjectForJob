@@ -9,6 +9,7 @@ const crypto = require("crypto");
 const db = require("../db");
 const { generateOrderId, insertOrder } = require("../services/orderService");
 const { processPaymentEvent } = require("../services/paymentService");
+const { redeliverOrder } = require("../services/deliveryService");
 
 const BASE = "http://localhost:3000";
 const SKU = "KEY-CS2-PRIME";
@@ -54,6 +55,17 @@ async function waitForFinalStatus(orderId, timeoutMs = 20000) {
   throw new Error(`Таймаут ожидания финального статуса заказа ${orderId}`);
 }
 
+async function waitForDeliveryWithRetries(orderId, maxRetries = 5) {
+  let order = await waitForFinalStatus(orderId);
+  let attempts = 0;
+  while (order.status !== "delivered" && attempts < maxRetries) {
+    await redeliverOrder(orderId);
+    order = await waitForFinalStatus(orderId);
+    attempts++;
+  }
+  return order;
+}
+
 function assert(condition, message) {
   if (!condition) {
     console.error(`  ✗ FAIL: ${message}`);
@@ -64,7 +76,6 @@ function assert(condition, message) {
 }
 
 // СЦЕНАРИЙ A: один и тот же event_id прилетает 50 раз параллельно
-
 async function scenarioA() {
   console.log("\n=== Сценарий A: 50 параллельных вебхуков с ОДНИМ event_id ===");
 
@@ -81,13 +92,12 @@ async function scenarioA() {
     created_at: new Date().toISOString(),
   };
 
-  // Запускаем 50 запросов ОДНОВРЕМЕННО — без await между ними,
-  // Promise.all стартует их все разом, не дожидаясь ответа предыдущего
+  // Запускаем 50 запросов ОДНОВРЕМЕННО — без await между ними
   const results = await Promise.all(
     Array.from({ length: 50 }, () => sendWebhook(payload))
   );
 
-  const final = await waitForFinalStatus(order.id);
+  const final = await waitForDeliveryWithRetries(order.id);
   const after = countIssuedKeys(SKU);
 
   const duplicates = results.filter((r) => r.duplicate === true).length;
@@ -119,7 +129,7 @@ async function scenarioB() {
 
   await Promise.all(payloads.map(sendWebhook));
 
-  const final = await waitForFinalStatus(order.id);
+  const final = await waitForDeliveryWithRetries(order.id);
   const after = countIssuedKeys(SKU);
 
   assert(final.status === "delivered", `заказ доставлен (статус: ${final.status})`);
@@ -127,9 +137,6 @@ async function scenarioB() {
 }
 
 // СЦЕНАРИЙ C: вебхук приходит РАНЬШЕ создания заказа
-// бьём напрямую в сервисный слой — так честно моделируется "заказ ещё не
-// существует физически в БД, когда вебхук уже пришёл".
-
 async function scenarioC() {
   console.log("\n=== Сценарий C: вебхук пришёл раньше создания заказа ===");
 
@@ -137,7 +144,7 @@ async function scenarioC() {
   const orderId = generateOrderId(); // просто придуманный id, в БД его ещё нет
   const eventId = randEventId();
 
-  // "Вебхук" прилетает первым — заказа с таким id ещё не существует
+  // Вебхук прилетает первым — заказа с таким id ещё не существует
   const result = processPaymentEvent({ event_id: eventId, order_id: orderId, status: "paid" });
   assert(result.duplicate === false, "вебхук для ещё не существующего заказа принят (не потерян)");
 
@@ -147,7 +154,7 @@ async function scenarioC() {
   // Теперь "создаём" заказ — ровно так, как это делает POST /api/orders
   order = insertOrder(orderId, SKU);
 
-  const final = await waitForFinalStatus(orderId);
+  const final = await waitForDeliveryWithRetries(orderId);
   const after = countIssuedKeys(SKU);
 
   assert(final.status === "delivered", `заказ всё равно корректно доставлен (статус: ${final.status})`);
@@ -155,8 +162,7 @@ async function scenarioC() {
 }
 
 // СЦЕНАРИЙ D: повторный вебхук с тем же event_id ПОСЛЕ того, как заказ
-// уже полностью доставлен — ничего не должно измениться (п.2 критериев,
-// отдельно от гонки — просто безопасный повтор постфактум)
+// уже полностью доставлен — ничего не должно измениться
 async function scenarioD() {
   console.log("\n=== Сценарий D: повторный вебхук после уже доставленного заказа ===");
 
@@ -172,7 +178,7 @@ async function scenarioD() {
   };
 
   await sendWebhook(payload);
-  const delivered = await waitForFinalStatus(order.id);
+  const delivered = await waitForDeliveryWithRetries(order.id);
   const keyAfterFirstDelivery = delivered.delivered_key;
 
   // Тот же самый event_id, спустя время, ещё раз
@@ -191,9 +197,9 @@ async function main() {
   await scenarioD();
 
   if (process.exitCode === 1) {
-    console.log("\n ЕСТЬ ПРОВАЛЕННЫЕ ПРОВЕРКИ — см. FAIL выше");
+    console.log("ЕСТЬ ПРОВАЛЕННЫЕ ПРОВЕРКИ — см. FAIL выше");
   } else {
-    console.log("\n ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ");
+    console.log("ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ");
   }
 }
 

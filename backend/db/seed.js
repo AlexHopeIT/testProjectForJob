@@ -1,6 +1,6 @@
 const db = require("./index");
 
-// Каталог товаров
+// Каталог товаров 
 const products = [
   { sku: "STEAM-TOPUP-500",  name: "Пополнение Steam 500 ₽",         type: "topup",        price: 500,  currency: "RUB", image: "steam.png" },
   { sku: "STEAM-TOPUP-1000", name: "Пополнение Steam 1000 ₽",        type: "topup",        price: 1000, currency: "RUB", image: "steam.png" },
@@ -14,9 +14,13 @@ const products = [
   { sku: "GIFT-PSN-1000",    name: "PlayStation Store карта 1000 ₽", type: "giftcard",     price: 1000, currency: "RUB", image: "game-pubg.jpg" },
   { sku: "GIFT-XBOX-1500",   name: "Xbox Gift Card 1500 ₽",          type: "giftcard",     price: 1500, currency: "RUB", image: "game-pubg.jpg" },
   { sku: "GIFT-ROBLOX-800",  name: "Roblox 800 Robux",               type: "giftcard",     price: 890,  currency: "RUB", image: "game-pubg.jpg" },
+  // Служебный товар для детерминированной проверки сценария "пул закончился" —
+  // в пуле у него всего 1 ключ, поэтому второй заказ
+  // на него гарантированно попадёт в out_of_stock без случайностей.
+  { sku: "KEY-TEST-SCARCE",  name: "[TEST] Товар с 1 ключом в пуле", type: "key",          price: 100,  currency: "RUB", image: "game-pubg.jpg" },
 ];
 
-// Пул ключей поставщика
+// Пул ключей поставщика 
 const supplierKeys = [
   "LFXC-TNCS-BPCD","P3EI-W8UO-9B4K","FEL3-GUXN-TCCH","YPLV-QK2Z-IUS5","0K9E-P1FR-BY1U",
   "5LZV-UQ48-RXCZ","X93K-NYAQ-GEC1","EIO5-CQT5-35KO","M58F-GIIR-VJAP","NU8Y-SWYB-6252",
@@ -38,6 +42,8 @@ const promocodes = [
   { code: "ONCEONLY",  type: "percent", value: 50, currency: null,  max_uses: 1 },
 ];
 
+// INSERT OR IGNORE — если запись с таким PRIMARY KEY уже есть, просто пропустить,
+// а не упасть с ошибкой
 const insertProduct = db.prepare(`
   INSERT OR IGNORE INTO products (sku, name, type, price, currency, image)
   VALUES (@sku, @name, @type, @price, @currency, @image)
@@ -56,6 +62,7 @@ const insertPromo = db.prepare(`
 const seedAll = db.transaction(() => {
   for (const p of products) insertProduct.run(p);
   for (const code of supplierKeys) insertKey.run({ sku: "KEY-CS2-PRIME", code });
+  insertKey.run({ sku: "KEY-TEST-SCARCE", code: "TEST-SCARCE-0001" });
   for (const promo of promocodes) insertPromo.run(promo);
 });
 

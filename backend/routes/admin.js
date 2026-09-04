@@ -1,10 +1,11 @@
 const express = require("express");
+const crypto = require("crypto");
 const db = require("../db");
 const { redeliverOrder } = require("../services/deliveryService");
 
 const router = express.Router();
 
-// Простая проверка токеном ("авторизацию можно
+// Простая проверка токеном — по ТЗ этого достаточно ("авторизацию можно
 // без неё или с простым токеном для админки"). Токен задаётся через
 // переменную окружения ADMIN_TOKEN, по умолчанию — "admin123" (для теста).
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin123";
@@ -40,6 +41,29 @@ router.post("/orders/:id/redeliver", async (req, res) => {
   const updated = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(req.params.id);
 
   res.json({ ...result, order: updated });
+});
+
+// GET /api/admin/keys/:sku/count — сколько ключей осталось по товару
+router.get("/keys/:sku/count", (req, res) => {
+  const row = db
+    .prepare(`SELECT COUNT(*) AS available FROM supplier_keys WHERE sku = ? AND status = 'available'`)
+    .get(req.params.sku);
+  res.json({ sku: req.params.sku, available: row.available });
+});
+
+// POST /api/admin/keys/restock  { sku: "STEAM-TOPUP-500", code?: "ABCD-1234" }
+// Пополнение пула — "code" необязателен: если не передать, сгенерируем сами.
+router.post("/keys/restock", (req, res) => {
+  const { sku, code } = req.body;
+  if (!sku) {
+    return res.status(400).json({ error: "sku_required" });
+  }
+
+  const finalCode = code || "RESTOCK-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+
+  db.prepare(`INSERT INTO supplier_keys (sku, code, status) VALUES (?, ?, 'available')`).run(sku, finalCode);
+
+  res.status(201).json({ sku, code: finalCode });
 });
 
 module.exports = router;

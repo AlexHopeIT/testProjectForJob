@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Admin — GameShop</title>
+    <style>
+      body {
+        font-family: monospace;
+        max-width: 900px;
+        margin: 30px auto;
+        padding: 0 16px;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      section {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+      }
+      input {
+        padding: 6px 8px;
+        margin-right: 8px;
+      }
+      button {
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        font-size: 13px;
+      }
+      td,
+      th {
+        border: 1px solid #ddd;
+        padding: 6px 8px;
+        text-align: left;
+      }
+      .status-out_of_stock,
+      .status-delivery_failed {
+        color: #b00;
+        font-weight: bold;
+      }
+      .status-delivered {
+        color: #0a0;
+        font-weight: bold;
+      }
+      pre {
+        background: #f5f5f5;
+        padding: 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>GameShop — Admin (только API, без дизайна)</h1>
+
+    <section>
+      <label>Admin token: <input id="token" value="admin123" /></label>
+      <span style="color: #888"
+        >(хранится только в памяти вкладки, никуда не отправляется кроме нашего
+        API)</span
+      >
+    </section>
+
+    <section>
+      <h3>Зависшие заказы (out_of_stock / delivery_failed)</h3>
+      <button onclick="loadStuck()">Обновить список</button>
+      <table id="stuckTable">
+        <thead>
+          <tr>
+            <th>id</th>
+            <th>sku</th>
+            <th>status</th>
+            <th>updated_at</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h3>Пул ключей</h3>
+      <input id="sku" placeholder="STEAM-TOPUP-500" value="STEAM-TOPUP-500" />
+      <button onclick="checkCount()">Проверить остаток</button>
+      <button onclick="restock()">Пополнить +1</button>
+      <pre id="poolResult"></pre>
+    </section>
+
+    <script>
+      const API_BASE = "http://localhost:3000";
+
+      function getToken() {
+        return document.getElementById("token").value;
+      }
+
+      async function adminFetch(path, options = {}) {
+        const res = await fetch(`${API_BASE}${path}`, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-token": getToken(),
+            ...(options.headers || {}),
+          },
+        });
+        const body = await res.json().catch(() => null);
+        return { status: res.status, body };
+      }
+
+      async function loadStuck() {
+        const { status, body } = await adminFetch("/api/admin/orders/stuck");
+        const tbody = document.querySelector("#stuckTable tbody");
+        tbody.innerHTML = "";
+
+        if (status === 401) {
+          tbody.innerHTML = `<tr><td colspan="5" style="color:red">401: неверный токен</td></tr>`;
+          return;
+        }
+
+        if (body.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="color:#888">Зависших заказов нет</td></tr>`;
+          return;
+        }
+
+        for (const order of body) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+      <td>${order.id}</td>
+      <td>${order.sku}</td>
+      <td class="status-${order.status}">${order.status}</td>
+      <td>${order.updated_at}</td>
+      <td><button onclick="redeliver('${order.id}')">Повторить выдачу</button></td>
+    `;
+          tbody.appendChild(tr);
+        }
+      }
+
+      async function redeliver(orderId) {
+        const { body } = await adminFetch(
+          `/api/admin/orders/${orderId}/redeliver`,
+          { method: "POST" },
+        );
+        alert(
+          `Заказ ${orderId}: ${body.order.status}` +
+            (body.order.delivered_key
+              ? ` (код: ${body.order.delivered_key})`
+              : ""),
+        );
+        loadStuck();
+      }
+
+      async function checkCount() {
+        const sku = document.getElementById("sku").value;
+        const { body } = await adminFetch(`/api/admin/keys/${sku}/count`);
+        document.getElementById("poolResult").textContent = JSON.stringify(
+          body,
+          null,
+          2,
+        );
+      }
+
+      async function restock() {
+        const sku = document.getElementById("sku").value;
+        const { body } = await adminFetch(`/api/admin/keys/restock`, {
+          method: "POST",
+          body: JSON.stringify({ sku }),
+        });
+        document.getElementById("poolResult").textContent =
+          "Добавлено: " + JSON.stringify(body, null, 2);
+      }
+
+      loadStuck();
+    </script>
+  </body>
+</html>

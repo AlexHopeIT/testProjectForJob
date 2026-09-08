@@ -1,3 +1,4 @@
+const http = require("http");
 const express = require("express");
 const cors = require("cors");
 
@@ -6,13 +7,14 @@ const ordersRouter = require("./routes/orders");
 const webhookRouter = require("./routes/webhook");
 const paymentSimRouter = require("./routes/paymentSim");
 const adminRouter = require("./routes/admin");
+const { initRealtime } = require("./services/realtime");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 
-// middleware, который разбирает тело запроса из JSON в обычный JS-объект (req.body)
+// middleware, который разбирает тело запроса из JSON в обычный JS-объект
 app.use(express.json());
 
 // простой роут для проверки, что сервер жив
@@ -26,6 +28,9 @@ app.use("/api", paymentSimRouter);
 app.use("/webhook", webhookRouter);
 app.use("/api/admin", adminRouter);
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+initRealtime(server);
+
+server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

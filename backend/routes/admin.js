@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const db = require("../db");
 const { redeliverOrder } = require("../services/deliveryService");
+const { broadcast } = require("../services/realtime");
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ function requireAdminToken(req, res, next) {
 
 router.use(requireAdminToken);
 
-// GET /api/admin/orders/stuck — заказы "оплачен, но не выдан"
+// GET /api/admin/orders/stuck — заказ "оплачен, но не выдан"
 router.get("/orders/stuck", (req, res) => {
   const orders = db
     .prepare(
@@ -51,7 +52,7 @@ router.get("/keys/:sku/count", (req, res) => {
   res.json({ sku: req.params.sku, available: row.available });
 });
 
-// POST /api/admin/keys/restock  { sku: "STEAM-TOPUP-500", code?: "ABCD-1234" }
+// POST /api/admin/keys/restock
 // Пополнение пула — "code" необязателен: если не передать, сгенерируем сами.
 router.post("/keys/restock", (req, res) => {
   const { sku, code } = req.body;
@@ -64,6 +65,28 @@ router.post("/keys/restock", (req, res) => {
   db.prepare(`INSERT INTO supplier_keys (sku, code, status) VALUES (?, ?, 'available')`).run(sku, finalCode);
 
   res.status(201).json({ sku, code: finalCode });
+});
+
+router.patch("/products/:sku", (req, res) => {
+  const { sku } = req.params;
+  const { price, stock_quantity } = req.body;
+
+  const product = db.prepare(`SELECT * FROM products WHERE sku = ?`).get(sku);
+  if (!product) {
+    return res.status(404).json({ error: "product_not_found" });
+  }
+
+  const newPrice = price !== undefined ? price : product.price;
+  const newStock = stock_quantity !== undefined ? stock_quantity : product.stock_quantity;
+
+  db.prepare(`UPDATE products SET price = ?, stock_quantity = ? WHERE sku = ?`).run(newPrice, newStock, sku);
+
+  const updated = db.prepare(`SELECT * FROM products WHERE sku = ?`).get(sku);
+
+  // Рассылаем ВСЕМ подключённым клиентам
+  broadcast({ type: "product_updated", product: updated });
+
+  res.json(updated);
 });
 
 module.exports = router;

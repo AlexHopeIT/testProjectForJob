@@ -1,26 +1,27 @@
 const db = require("./index");
 
-// Каталог товаров 
+// Каталог товаров
 const products = [
-  { sku: "STEAM-TOPUP-500",  name: "Пополнение Steam 500 ₽",         type: "topup",        price: 500,  currency: "RUB", image: "steam.png" },
-  { sku: "STEAM-TOPUP-1000", name: "Пополнение Steam 1000 ₽",        type: "topup",        price: 1000, currency: "RUB", image: "steam.png" },
-  { sku: "STEAM-TOPUP-2500", name: "Пополнение Steam 2500 ₽",        type: "topup",        price: 2500, currency: "RUB", image: "steam.png" },
-  { sku: "KEY-CS2-PRIME",    name: "CS2 Prime Status ключ",          type: "key",          price: 1290, currency: "RUB", image: "game-rogue.jpg" },
-  { sku: "KEY-GTA5",         name: "GTA V ключ активации",           type: "key",          price: 1990, currency: "RUB", image: "game-zombie.jpg" },
-  { sku: "KEY-EFT",          name: "Escape from Tarkov ключ",        type: "key",          price: 3490, currency: "RUB", image: "game-wildcat.jpg" },
-  { sku: "SUB-DISCORD-1M",   name: "Discord Nitro 1 месяц",          type: "subscription", price: 399,  currency: "RUB", image: "game-pubg.jpg" },
-  { sku: "SUB-YT-3M",        name: "YouTube Premium 3 месяца",       type: "subscription", price: 1490, currency: "RUB", image: "game-pubg.jpg" },
-  { sku: "SUB-SPOTIFY-1M",   name: "Spotify Premium 1 месяц",        type: "subscription", price: 299,  currency: "RUB", image: "game-pubg.jpg" },
-  { sku: "GIFT-PSN-1000",    name: "PlayStation Store карта 1000 ₽", type: "giftcard",     price: 1000, currency: "RUB", image: "game-pubg.jpg" },
-  { sku: "GIFT-XBOX-1500",   name: "Xbox Gift Card 1500 ₽",          type: "giftcard",     price: 1500, currency: "RUB", image: "game-pubg.jpg" },
-  { sku: "GIFT-ROBLOX-800",  name: "Roblox 800 Robux",               type: "giftcard",     price: 890,  currency: "RUB", image: "game-pubg.jpg" },
+  { sku: "STEAM-TOPUP-500",  name: "Пополнение Steam 500 ₽",         type: "topup",        price: 500,  currency: "RUB", image: "steam.png",       stock_quantity: 20 },
+  { sku: "STEAM-TOPUP-1000", name: "Пополнение Steam 1000 ₽",        type: "topup",        price: 1000, currency: "RUB", image: "steam.png",       stock_quantity: 20 },
+  { sku: "STEAM-TOPUP-2500", name: "Пополнение Steam 2500 ₽",        type: "topup",        price: 2500, currency: "RUB", image: "steam.png",       stock_quantity: 20 },
+  // Специально МАЛЫЙ остаток — удобно демонстрировать "гонку за последней единицей"
+  { sku: "KEY-CS2-PRIME",    name: "CS2 Prime Status ключ",          type: "key",          price: 1290, currency: "RUB", image: "game-rogue.jpg",  stock_quantity: 3 },
+  { sku: "KEY-GTA5",         name: "GTA V ключ активации",           type: "key",          price: 1990, currency: "RUB", image: "game-zombie.jpg", stock_quantity: 15 },
+  { sku: "KEY-EFT",          name: "Escape from Tarkov ключ",        type: "key",          price: 3490, currency: "RUB", image: "game-wildcat.jpg",stock_quantity: 15 },
+  { sku: "SUB-DISCORD-1M",   name: "Discord Nitro 1 месяц",          type: "subscription", price: 399,  currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 15 },
+  { sku: "SUB-YT-3M",        name: "YouTube Premium 3 месяца",       type: "subscription", price: 1490, currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 15 },
+  { sku: "SUB-SPOTIFY-1M",   name: "Spotify Premium 1 месяц",        type: "subscription", price: 299,  currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 15 },
+  { sku: "GIFT-PSN-1000",    name: "PlayStation Store карта 1000 ₽", type: "giftcard",     price: 1000, currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 15 },
+  { sku: "GIFT-XBOX-1500",   name: "Xbox Gift Card 1500 ₽",          type: "giftcard",     price: 1500, currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 15 },
+  { sku: "GIFT-ROBLOX-800",  name: "Roblox 800 Robux",               type: "giftcard",     price: 890,  currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 15 },
   // Служебный товар для детерминированной проверки сценария "пул закончился" —
   // в пуле у него всего 1 ключ, поэтому второй заказ
   // на него гарантированно попадёт в out_of_stock без случайностей.
-  { sku: "KEY-TEST-SCARCE",  name: "[TEST] Товар с 1 ключом в пуле", type: "key",          price: 100,  currency: "RUB", image: "game-pubg.jpg" },
+  { sku: "KEY-TEST-SCARCE",  name: "[TEST] Товар с 1 ключом в пуле", type: "key",          price: 100,  currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 1 },
 ];
 
-// Пул ключей поставщика 
+// Пул ключей поставщика
 const supplierKeys = [
   "LFXC-TNCS-BPCD","P3EI-W8UO-9B4K","FEL3-GUXN-TCCH","YPLV-QK2Z-IUS5","0K9E-P1FR-BY1U",
   "5LZV-UQ48-RXCZ","X93K-NYAQ-GEC1","EIO5-CQT5-35KO","M58F-GIIR-VJAP","NU8Y-SWYB-6252",
@@ -42,11 +43,9 @@ const promocodes = [
   { code: "ONCEONLY",  type: "percent", value: 50, currency: null,  max_uses: 1 },
 ];
 
-// INSERT OR IGNORE — если запись с таким PRIMARY KEY уже есть, просто пропустить,
-// а не упасть с ошибкой
 const insertProduct = db.prepare(`
-  INSERT OR IGNORE INTO products (sku, name, type, price, currency, image)
-  VALUES (@sku, @name, @type, @price, @currency, @image)
+  INSERT OR IGNORE INTO products (sku, name, type, price, currency, image, stock_quantity)
+  VALUES (@sku, @name, @type, @price, @currency, @image, @stock_quantity)
 `);
 
 const insertKey = db.prepare(`
@@ -61,7 +60,15 @@ const insertPromo = db.prepare(`
 
 const seedAll = db.transaction(() => {
   for (const p of products) insertProduct.run(p);
-  for (const code of supplierKeys) insertKey.run({ sku: "KEY-CS2-PRIME", code });
+
+  const demoSkus = ["STEAM-TOPUP-500", "KEY-CS2-PRIME", "KEY-GTA5", "KEY-EFT", "SUB-DISCORD-1M"];
+  const perSku = Math.floor(supplierKeys.length / demoSkus.length);
+
+  demoSkus.forEach((sku, i) => {
+    const chunk = supplierKeys.slice(i * perSku, (i + 1) * perSku);
+    chunk.forEach((code) => insertKey.run({ sku, code }));
+  });
+
   insertKey.run({ sku: "KEY-TEST-SCARCE", code: "TEST-SCARCE-0001" });
   for (const promo of promocodes) insertPromo.run(promo);
 });

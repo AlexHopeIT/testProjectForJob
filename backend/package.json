@@ -9,7 +9,10 @@
     "seed": "node db/seed.js",
     "test:race": "node scripts/race-test.js",
     "test:recovery": "node scripts/recovery-test.js",
-    "test:promo": "node scripts/promo-test.js"
+    "test:promo": "node scripts/promo-test.js",
+    "test:stockrace": "node scripts/stockrace-test.js",
+    "test:reservation": "node scripts/reservation-test.js",
+    "test:idempotency": "node scripts/idempotency-test.js"
   },
   "keywords": [],
   "author": "",

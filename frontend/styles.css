@@ -2,7 +2,7 @@
 * {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  box-sizing: border-box; /* padding и border не увеличивают ширину блока — иначе верстка плывёт */
 }
 
 body {
@@ -27,6 +27,7 @@ button {
   background: none;
 }
 
+/* Общий контейнер, чтобы контент не растягивался во всю ширину экрана */
 .header,
 .banner,
 .services,
@@ -39,7 +40,7 @@ button {
 
 /* ШАПКА */
 .header {
-  position: relative;
+  position: relative; /* нужно, чтобы выпадающее меню каталога позиционировалось относительно шапки */
   display: flex;
   align-items: center;
   gap: 16px;
@@ -164,7 +165,7 @@ button {
   position: relative;
   margin-top: 16px;
   border-radius: 14px;
-  overflow: hidden; /* обрезает слайды, которые уезжают за пределы видимой области */
+  overflow: hidden;
   height: 220px;
 }
 
@@ -245,7 +246,7 @@ button {
   gap: 6px;
   padding: 8px;
   border-radius: 12px;
-  transition: background 0.2s ease, transform 0.2s ease; /* пункт 4 интерактива: плавное выделение */
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .service:hover {
@@ -455,6 +456,14 @@ button {
 
 .product-card button:hover {
   opacity: 0.85;
+}
+
+.product-card button:disabled,
+.btn-buy:disabled {
+  background: #ccc;
+  color: #888;
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 /* Адаптив по-минимуму, чтобы на узких экранах не разваливалось всё в кашу */

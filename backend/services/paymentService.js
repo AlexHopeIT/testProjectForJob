@@ -1,26 +1,32 @@
 const db = require("../db");
 const { deliverOrder } = require("./deliveryService");
+const { broadcast } = require("./realtime");
 
 function nowIso() {
   return new Date().toISOString();
 }
 
-// Пытается перевести заказ created -> paid или created -> payment_failed.
-// Атомарно (условный WHERE), поэтому безопасно вызывать сколько угодно раз.
-// Возвращает true, если реально что-то изменилось.
 function applyStatus(orderId, paymentStatus) {
   const targetStatus = paymentStatus === "paid" ? "paid" : "payment_failed";
   const result = db
     .prepare(`UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status = 'created'`)
     .run(targetStatus, nowIso(), orderId);
-  return result.changes === 1;
+
+  const changed = result.changes === 1;
+
+  if (changed && targetStatus === "payment_failed") {
+    const order = db.prepare(`SELECT sku FROM orders WHERE id = ?`).get(orderId);
+    db.prepare(`UPDATE products SET stock_quantity = stock_quantity + 1 WHERE sku = ?`).run(order.sku);
+    const product = db.prepare(`SELECT * FROM products WHERE sku = ?`).get(order.sku);
+    broadcast({ type: "product_updated", product });
+  }
+
+  return changed;
 }
 
 // Главная точка входа — вызывается из роута POST /webhook/payment.
 function processPaymentEvent({ event_id, order_id, status }) {
-  // INSERT в таблицу с PRIMARY KEY(event_id): если такая запись уже есть,
-  // БД выбросит ошибку с кодом SQLITE_CONSTRAINT_PRIMARYKEY.
-  // Ловим её и трактуем как "событие уже обработано, ничего не делаем".
+  // Идемпотентность по event_id
   try {
     db.prepare(`INSERT INTO webhook_events (event_id, order_id, status) VALUES (?, ?, ?)`).run(
       event_id,
@@ -31,7 +37,7 @@ function processPaymentEvent({ event_id, order_id, status }) {
     if (err.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || err.code === "SQLITE_CONSTRAINT") {
       return { duplicate: true };
     }
-    throw err; // неожиданная ошибка — не глушим, пусть падает наверх
+    throw err;
   }
 
   const changed = applyStatus(order_id, status);
@@ -60,7 +66,7 @@ function catchUpPendingEvents(orderId) {
         console.error(`Delivery error for order ${orderId}:`, err);
       });
     }
-    if (changed) break; // статус сменился один раз — дальше уже все переходы будут no-op
+    if (changed) break; // статус сменился один раз
   }
 }
 

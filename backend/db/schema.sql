@@ -13,12 +13,14 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS orders (
   id                TEXT PRIMARY KEY,
   sku               TEXT NOT NULL REFERENCES products(sku),
-  amount            INTEGER NOT NULL,    -- итоговая сумма к оплате
+  amount            INTEGER NOT NULL,     -- итоговая сумма к оплате (после промокода)
   currency          TEXT NOT NULL,
   promocode         TEXT,                 -- какой промокод применён (может быть NULL)
   status            TEXT NOT NULL DEFAULT 'created',
   delivered_key     TEXT,                 -- финальный выданный код (когда status = delivered)
   supplier_request_id TEXT,               -- request_id, который мы передаём поставщику — фиксируем один раз на заказ
+  expires_at        TEXT,
+  idempotency_key   TEXT UNIQUE,
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -36,7 +38,7 @@ CREATE TABLE IF NOT EXISTS supplier_keys (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   sku      TEXT NOT NULL,
   code     TEXT NOT NULL UNIQUE,
-  status   TEXT NOT NULL DEFAULT 'available'   -- available | issued
+  status   TEXT NOT NULL DEFAULT 'available'
 );
 
 -- ИДЕМПОТЕНТНОСТЬ ВЫДАЧИ У ПОСТАВЩИКА (ловушка таймаута)
@@ -47,7 +49,7 @@ CREATE TABLE IF NOT EXISTS issue_requests (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
--- ПРОМОКОДЫ
+-- ПРОМОКОДЫ (этап 4)
 CREATE TABLE IF NOT EXISTS promocodes (
   code        TEXT PRIMARY KEY,
   type        TEXT NOT NULL,

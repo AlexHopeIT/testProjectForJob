@@ -18,6 +18,7 @@ function broadcast(message) {
   if (!wss) return;
   const payload = JSON.stringify(message);
   for (const client of wss.clients) {
+    // если клиент в процессе переподключения или уже отвалился, просто пропускаем его
     if (client.readyState === 1) {
       client.send(payload);
     }

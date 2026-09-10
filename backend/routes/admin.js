@@ -6,8 +6,7 @@ const { broadcast } = require("../services/realtime");
 
 const router = express.Router();
 
-// Простая проверка токеном — по ТЗ этого достаточно ("авторизацию можно
-// без неё или с простым токеном для админки"). Токен задаётся через
+// Простая проверка токеном. Токен задаётся через
 // переменную окружения ADMIN_TOKEN, по умолчанию — "admin123" (для теста).
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin123";
 
@@ -21,7 +20,7 @@ function requireAdminToken(req, res, next) {
 
 router.use(requireAdminToken);
 
-// GET /api/admin/orders/stuck — заказ "оплачен, но не выдан"
+// GET /api/admin/orders/stuck — заказы "оплачен, но не выдан"
 router.get("/orders/stuck", (req, res) => {
   const orders = db
     .prepare(
@@ -52,8 +51,7 @@ router.get("/keys/:sku/count", (req, res) => {
   res.json({ sku: req.params.sku, available: row.available });
 });
 
-// POST /api/admin/keys/restock
-// Пополнение пула — "code" необязателен: если не передать, сгенерируем сами.
+// POST /api/admin/keys/restock  { sku: "STEAM-TOPUP-500", code?: "ABCD-1234" }
 router.post("/keys/restock", (req, res) => {
   const { sku, code } = req.body;
   if (!sku) {

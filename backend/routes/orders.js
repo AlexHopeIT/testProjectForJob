@@ -4,7 +4,7 @@ const { createOrder } = require("../services/orderService");
 
 const router = express.Router();
 
-// POST /api/orders  { sku: "STEAM-TOPUP-500", promocode?: "WELCOME10" }
+// POST /api/orders
 router.post("/orders", (req, res) => {
   const { sku, promocode } = req.body;
 
@@ -13,7 +13,8 @@ router.post("/orders", (req, res) => {
   }
 
   try {
-    const order = createOrder(sku, promocode || null);
+    const idempotencyKey = req.header("Idempotency-Key") || null;
+    const order = createOrder(sku, promocode || null, idempotencyKey);
     res.status(201).json(order);
   } catch (err) {
     if (err.code === "product_not_found") {
@@ -24,6 +25,9 @@ router.post("/orders", (req, res) => {
     }
     if (err.code === "promocode_limit_reached") {
       return res.status(400).json({ error: "promocode_limit_reached" });
+    }
+    if (err.code === "sold_out") {
+      return res.status(409).json({ error: "sold_out" });
     }
     throw err;
   }

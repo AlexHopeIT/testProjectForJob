@@ -4,7 +4,7 @@ const { createOrder } = require("../services/orderService");
 
 const router = express.Router();
 
-// POST /api/orders
+// POST /api/orders  { sku: "STEAM-TOPUP-500", promocode?: "WELCOME10" }
 router.post("/orders", (req, res) => {
   const { sku, promocode } = req.body;
 

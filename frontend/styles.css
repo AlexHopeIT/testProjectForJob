@@ -2,7 +2,7 @@
 * {
   margin: 0;
   padding: 0;
-  box-sizing: border-box; /* padding и border не увеличивают ширину блока — иначе верстка плывёт */
+  box-sizing: border-box;
 }
 
 body {
@@ -40,7 +40,7 @@ button {
 
 /* ШАПКА */
 .header {
-  position: relative; /* нужно, чтобы выпадающее меню каталога позиционировалось относительно шапки */
+  position: relative; 
   display: flex;
   align-items: center;
   gap: 16px;
@@ -246,7 +246,7 @@ button {
   gap: 6px;
   padding: 8px;
   border-radius: 12px;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease; 
 }
 
 .service:hover {
@@ -408,7 +408,7 @@ button {
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid transparent;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease; /* пункт 5 интерактива */
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
 .product-card:hover {
@@ -483,6 +483,84 @@ button {
   .header {
     flex-wrap: wrap;
   }
+}
+
+/* панель живого поиска */
+.search-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  z-index: 60;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.search-panel__filters {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+  flex-wrap: wrap;
+}
+
+.search-filter {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f3f3f3;
+  color: #555;
+}
+
+.search-filter--active {
+  background: #111;
+  color: #fff;
+}
+
+.search-panel__meta {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #999;
+}
+
+.search-panel__results {
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.search-result {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.search-result:hover {
+  background: #f7f7f7;
+}
+
+.search-result__name {
+  color: #222;
+}
+
+.search-result__price {
+  color: #1a9c3c;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.search-panel__empty {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
 }
 
 /* МОДАЛКА СТАТУСА ЗАКАЗА */

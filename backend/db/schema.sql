@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS issue_requests (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
--- ПРОМОКОДЫ (этап 4)
+-- ПРОМОКОДЫ
 CREATE TABLE IF NOT EXISTS promocodes (
   code        TEXT PRIMARY KEY,
   type        TEXT NOT NULL,
@@ -57,4 +57,21 @@ CREATE TABLE IF NOT EXISTS promocodes (
   currency    TEXT,
   max_uses    INTEGER NOT NULL,
   used_count  INTEGER NOT NULL DEFAULT 0
+);
+
+-- БОЛЬШОЙ КАТАЛОГ ДЛЯ ПОИСКА
+CREATE TABLE IF NOT EXISTS search_items (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  sku      TEXT NOT NULL UNIQUE,
+  name     TEXT NOT NULL,
+  type     TEXT NOT NULL,
+  price    INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'RUB'
+);
+
+-- FTS5
+CREATE VIRTUAL TABLE IF NOT EXISTS search_items_fts USING fts5(
+  sku,
+  name,
+  content=''
 );

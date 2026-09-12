@@ -1,4 +1,5 @@
 const db = require("./index");
+const { generateSearchCatalog } = require("./generateSearchCatalog");
 
 // Каталог товаров
 const products = [
@@ -14,10 +15,13 @@ const products = [
   { sku: "GIFT-PSN-1000",    name: "PlayStation Store карта 1000 ₽", type: "giftcard",     price: 1000, currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 1000 },
   { sku: "GIFT-XBOX-1500",   name: "Xbox Gift Card 1500 ₽",          type: "giftcard",     price: 1500, currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 1000 },
   { sku: "GIFT-ROBLOX-800",  name: "Roblox 800 Robux",               type: "giftcard",     price: 890,  currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 1000 },
-  // Служебный товар для детерминированной проверки сценария "пул поставщика закончился"
+  // Служебный товар для детерминированной проверки сценария "пул поставщика
+  // закончился" — остаток на СКЛАДЕ (stock_quantity)
+  // тут щедрый специально, чтобы не смешивать два разных вида дефицита:
+  // это про нехватку у ПОСТАВЩИКА, а не про нехватку "на складе витрины".
   { sku: "KEY-TEST-SCARCE",  name: "[TEST] Товар с 1 ключом в пуле", type: "key",          price: 100,  currency: "RUB", image: "game-pubg.jpg",   stock_quantity: 1000 },
   // Отдельный товар СПЕЦИАЛЬНО для демонстрации "гонки за последней единицей"
-  // — остаток намеренно = 
+  // — остаток намеренно = 1, и никакой другой тест его не трогает.
   { sku: "DEMO-LAST-UNIT",   name: "[DEMO] Последний экземпляр",     type: "key",          price: 2000, currency: "RUB", image: "game-rogue.jpg",  stock_quantity: 1 },
 ];
 
@@ -61,10 +65,6 @@ const insertPromo = db.prepare(`
 const seedAll = db.transaction(() => {
   for (const p of products) insertProduct.run(p);
 
-  // Раздаём пул ключей поровну между 5 товарами, которые реально показаны
-  // на витрине, чтобы КАЖДАЯ карточка
-  // "Купить" на фронте доводила покупку до конца, а не только одна.
-  // 50 ключей / 5 товаров = по 10 на каждый.
   const demoSkus = ["STEAM-TOPUP-500", "KEY-CS2-PRIME", "KEY-GTA5", "KEY-EFT", "SUB-DISCORD-1M"];
   const perSku = Math.floor(supplierKeys.length / demoSkus.length);
 
@@ -75,6 +75,7 @@ const seedAll = db.transaction(() => {
 
   insertKey.run({ sku: "KEY-TEST-SCARCE", code: "TEST-SCARCE-0001" });
 
+  // DEMO-LAST-UNIT: щедрый пул у поставщика
   for (let i = 1; i <= 20; i++) {
     insertKey.run({ sku: "DEMO-LAST-UNIT", code: `DEMO-KEY-${String(i).padStart(4, "0")}` });
   }
@@ -88,3 +89,7 @@ console.log("Seed завершён:");
 console.log("  products:", db.prepare("SELECT COUNT(*) AS c FROM products").get().c);
 console.log("  supplier_keys:", db.prepare("SELECT COUNT(*) AS c FROM supplier_keys").get().c);
 console.log("  promocodes:", db.prepare("SELECT COUNT(*) AS c FROM promocodes").get().c);
+
+// Отдельно от куратор-ского каталога — большой синтетический массив
+// специально для Задачи 5 (мгновенный поиск), в СВОЮ таблицу search_items
+generateSearchCatalog(5200);

@@ -17,17 +17,30 @@
       </button>
     </div>
 
-    <div class="header__search">
-      <input type="text" placeholder="Игра, приложение или услуга..." />
+    <div class="header__search" style="position: relative;">
+      <input type="text" id="searchInput" placeholder="Игра, приложение или услуга..." autocomplete="off" />
       <button class="icon-btn" aria-label="Избранное">♡</button>
       <button class="icon-btn icon-btn--dark" aria-label="Поиск">🔍</button>
+
+      <!-- выпадающая панель результатов поиска -->
+      <div class="search-panel hidden" id="searchPanel">
+        <div class="search-panel__filters" id="searchFilters">
+          <button class="search-filter" data-type="">Все</button>
+          <button class="search-filter" data-type="key">Ключи</button>
+          <button class="search-filter" data-type="topup">Пополнения</button>
+          <button class="search-filter" data-type="subscription">Подписки</button>
+          <button class="search-filter" data-type="giftcard">Гифт-карты</button>
+        </div>
+        <div class="search-panel__meta" id="searchMeta"></div>
+        <div class="search-panel__results" id="searchResults"></div>
+      </div>
     </div>
 
     <div class="header__right">
       <button class="icon-btn icon-btn--round" aria-label="Профиль">👤</button>
     </div>
 
-    <!-- Выпадающее меню каталога. По умолчанию скрыто (класс hidden управляется в JS) -->
+    <!-- Выпадающее меню каталога. По умолчанию скрыто -->
     <div class="catalog-menu hidden" id="catalogMenu">
       <div class="catalog-menu__sidebar">
         <a href="#" class="catalog-menu__item catalog-menu__item--active">Игры и игровые сервисы</a>
@@ -136,6 +149,7 @@
   <!-- ===== МОДАЛКА СТАТУСА ЗАКАЗА ===== -->
   <div class="modal hidden" id="orderModal">
     <div class="modal__content" id="orderModalContent">
+      <!-- заполняется через JS -->
     </div>
   </div>
 

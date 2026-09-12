@@ -3,7 +3,7 @@ const db = require("../db");
 const { catchUpPendingEvents } = require("./paymentService");
 const { broadcast } = require("./realtime");
 
-// на сколько секунд бронируется единица товара.
+// На сколько секунд бронируется единица товара.
 // Вынесено в переменную окружения, чтобы тестам не приходилось реально
 // ждать несколько минут — можно указать RESERVATION_TTL_SECONDS=2 для теста.
 const RESERVATION_TTL_SECONDS = Number(process.env.RESERVATION_TTL_SECONDS) || 120;
@@ -30,7 +30,6 @@ function broadcastProductState(sku) {
   broadcast({ type: "product_updated", product });
 }
 
-// Атомарно "списывает" одно использование промокода
 function claimPromoUsage(code) {
   const promo = db.prepare(`SELECT * FROM promocodes WHERE code = ?`).get(code);
   if (!promo) {
@@ -60,23 +59,28 @@ function applyDiscount(price, promo) {
   return Math.max(0, price - promo.value); // type === "amount"
 }
 
-function insertOrder(orderId, sku, promocode = null) {
+// Вставляет строку заказа по уже готовому id и сразу проверяет "хвосты" —
+// вебхуки, которые могли прийти для этого order_id ДО того, как заказ
+// физически появился в базе.
+// Вынесено отдельно от createOrder(), чтобы тестовый скрипт мог сам
+// решить, КОГДА именно вставлять строку — это и нужно для симуляции гонки.
+function insertOrder(orderId, sku, promocode = null, idempotencyKey = null) {
   const product = db.prepare(`SELECT * FROM products WHERE sku = ?`).get(sku);
   if (!product) {
     const err = new Error("product_not_found");
     err.code = "product_not_found";
     throw err;
   }
-
   const run = db.transaction(() => {
-    claimStock(sku); // первым делом — забираем единицу со склада
+    claimStock(sku);
     const promo = promocode ? claimPromoUsage(promocode) : null;
     const amount = applyDiscount(product.price, promo);
     const expiresAt = new Date(Date.now() + RESERVATION_TTL_SECONDS * 1000).toISOString();
 
     db.prepare(
-      `INSERT INTO orders (id, sku, amount, currency, promocode, status, expires_at) VALUES (?, ?, ?, ?, ?, 'created', ?)`
-    ).run(orderId, sku, amount, product.currency, promocode, expiresAt);
+      `INSERT INTO orders (id, sku, amount, currency, promocode, status, expires_at, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, 'created', ?, ?)`
+    ).run(orderId, sku, amount, product.currency, promocode, expiresAt, idempotencyKey);
   });
 
   run();
@@ -95,11 +99,12 @@ function createOrder(sku, promocode = null, idempotencyKey = null) {
     const existing = db.prepare(`SELECT * FROM orders WHERE idempotency_key = ?`).get(idempotencyKey);
     if (existing) return existing;
   }
- 
+
   const orderId = generateOrderId();
- 
+
   try {
-    return insertOrder(orderId, sku, promocode, idempotencyKey);
+    const result = insertOrder(orderId, sku, promocode, idempotencyKey);
+    return result;
   } catch (err) {
     const isIdempotencyClash = idempotencyKey && String(err.code || "").startsWith("SQLITE_CONSTRAINT");
     if (isIdempotencyClash) {
@@ -109,5 +114,5 @@ function createOrder(sku, promocode = null, idempotencyKey = null) {
     throw err;
   }
 }
- 
+
 module.exports = { generateOrderId, insertOrder, createOrder };

@@ -1,4 +1,5 @@
 // 0. КОНФИГУРАЦИЯ API
+
 const API_BASE = "http://localhost:3000";
 
 async function apiFetch(path, options = {}) {
@@ -31,8 +32,6 @@ async function loadProducts() {
   currentProducts = ok && Array.isArray(body) ? body.slice(0, 5) : FALLBACK_PRODUCTS;
   renderProducts(currentProducts);
 
-  // Блок пополнения Steam показывает цену/доступность конкретного товара —
-  // синхронизируем его тоже, если этот sku попал в загруженный список
   const topupSku = document.getElementById("topupBuyBtn").dataset.sku;
   const topupProduct = currentProducts.find((p) => p.sku === topupSku);
   if (topupProduct) updateTopupUI(topupProduct);
@@ -120,7 +119,7 @@ loadProducts();
   });
 })();
 
-// 5. ПЕРЕКЛЮЧАТЕЛЬ ВАЛЮТ 
+// 5. ПЕРЕКЛЮЧАТЕЛЬ ВАЛЮТ
 (function initCurrencySwitch() {
   const wrap = document.getElementById("currencySwitch");
   const buttons = wrap.querySelectorAll(".currency-switch__btn");
@@ -134,22 +133,11 @@ loadProducts();
 })();
 
 // 6. ФЛОУ ПОКУПКИ: создание заказа -> модалка статуса -> эмуляция оплаты
-//    -> поллинг статуса до финального состояния
-// 6.1 устойчивость к двойному клику, "Назад",
+//    -> поллинг статуса до финального состояния.
+
+// 6.1 Устойчивость к двойному клику, "Назад",
 //     обновлению страницы и обрыву связи.
-//
-//     Три уровня защиты:
-//     1) pendingSkus (Set) — синхронная блокировка ВТОРОГО клика ДО того,
-//        как первый запрос вообще ушёл на сервер. Работает благодаря
-//        однопоточности JS: проверка "уже покупаем этот sku?" и пометка
-//        "теперь покупаем" происходят в одном синхронном участке кода,
-//        между ними физически не может вклиниться другой обработчик клика.
-//     2) Idempotency-Key — если первый уровень как-то обошли (два разных
-//        вызова fetch всё же ушли), сервер сам склеит их в один заказ.
-//     3) localStorage — если страницу обновили или нажали "Назад",
-//        активный заказ по sku находится и переоткрывается, вместо
-//        создания нового.
-const ACTIVE_ORDERS_KEY = "activeOrdersBySku"; // localStorage
+const ACTIVE_ORDERS_KEY = "activeOrdersBySku";
 
 function getActiveOrders() {
   try {
@@ -171,6 +159,8 @@ function clearActiveOrder(sku) {
   localStorage.setItem(ACTIVE_ORDERS_KEY, JSON.stringify(all));
 }
 
+// sku, для которых прямо сейчас уже идёт запрос на создание заказа —
+// синхронная блокировка ДО сетевого запроса
 const pendingSkus = new Set();
 
 function generateIdempotencyKey() {
@@ -189,8 +179,6 @@ function stopPolling() {
   }
 }
 
-// Форматирует миллисекунды в "MM:SS" для обратного отсчёта брони.
-// Работает от АБСОЛЮТНОГО момента времени (expires_at с сервера)
 function formatCountdown(msRemaining) {
   const totalSeconds = Math.max(0, Math.ceil(msRemaining / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -198,9 +186,6 @@ function formatCountdown(msRemaining) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-// Что показать в модалке в зависимости от текущего статуса заказа.
-// Вынесено в отдельную функцию, потому что вызывается и сразу при открытии,
-// и на каждом шаге поллинга — не дублировать разметку в двух местах.
 function renderModalContent(order) {
   const modal = document.getElementById("orderModalContent");
 
@@ -287,18 +272,23 @@ function startPolling(orderId) {
     renderModalContent(order);
     if (FINAL_STATUSES.includes(order.status)) {
       stopPolling();
-      clearActiveOrder(order.sku);
+      clearActiveOrder(order.sku); // заказ завершён — больше не "активный", не нужно его восстанавливать
     }
   }, 1000);
 }
 
 async function handleBuyClick(sku) {
+  // --- Синхронная блокировка повторного клика ---
+
   if (pendingSkus.has(sku)) {
     return;
   }
   pendingSkus.add(sku);
 
   try {
+    // --- Может, у нас уже ЕСТЬ активный заказ на этот sku
+    // (страницу обновили, нажали "Назад") — тогда не создаём новый,
+    // а просто показываем текущий статус старого ---
     const savedOrderId = getActiveOrders()[sku];
     if (savedOrderId) {
       const { ok, body: existingOrder } = await apiFetch(`/api/orders/${savedOrderId}`);
@@ -312,6 +302,10 @@ async function handleBuyClick(sku) {
       clearActiveOrder(sku);
     }
 
+    // --- idempotency key на случай, если два запроса всё же
+    // ушли параллельно (например, два разных вызова handleBuyClick,
+    // случившихся до того, как pendingSkus.add() успел отработать —
+    // подстраховка на подстраховку) ---
     const { ok, body } = await apiFetch("/api/orders", {
       method: "POST",
       headers: { "Idempotency-Key": generateIdempotencyKey() },
@@ -339,7 +333,8 @@ async function handleBuyClick(sku) {
 }
 
 // При загрузке страницы (в т.ч. после обновления или возврата "Назад")
-// проверяем, нет ли уже активного заказа, о котором нужно напомнить
+// проверяем, нет ли уже активного заказа, о котором нужно напомнить —
+// это и есть "после обновления страницы виден верный статус заказа"
 async function resumeActiveOrders() {
   const all = getActiveOrders();
   for (const sku of Object.keys(all)) {
@@ -354,6 +349,132 @@ async function resumeActiveOrders() {
 }
 
 resumeActiveOrders();
+
+// 8. мгновенный поиск по большому каталогу.
+
+const searchInput = document.getElementById("searchInput");
+const searchPanel = document.getElementById("searchPanel");
+const searchResults = document.getElementById("searchResults");
+const searchMeta = document.getElementById("searchMeta");
+const searchFilters = document.getElementById("searchFilters");
+
+let searchDebounceTimer = null;
+let searchAbortController = null; // ссылка на "предыдущий" запрос, чтобы можно было его отменить
+let activeType = "";
+
+function updateUrlFromSearch(query, type) {
+  const params = new URLSearchParams(window.location.search);
+  query ? params.set("q", query) : params.delete("q");
+  type ? params.set("type", type) : params.delete("type");
+  const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`;
+  window.history.replaceState({}, "", newUrl);
+}
+
+async function runSearch(query, type) {
+  // Отменяем предыдущий незавершённый запрос — если он ещё не успел
+  // ответить, его ответ нам больше не нужен и не должен ничего перезаписать
+  if (searchAbortController) {
+    searchAbortController.abort();
+  }
+  searchAbortController = new AbortController();
+
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  if (type) params.set("type", type);
+  params.set("limit", "20");
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE}/api/search?${params.toString()}`, {
+      signal: searchAbortController.signal,
+    });
+  } catch (err) {
+    if (err.name === "AbortError") return; // это ожидаемая отмена, не ошибка!!!
+    renderSearchResults({ total: 0, results: [] }, query);
+    return;
+  }
+
+  const data = await response.json().catch(() => ({ total: 0, results: [] }));
+  renderSearchResults(data, query);
+}
+
+function renderSearchResults(data, query) {
+  searchMeta.textContent = query || activeType ? `Найдено: ${data.total}` : "Начните вводить запрос...";
+
+  if (data.results.length === 0) {
+    searchResults.innerHTML = query || activeType
+      ? `<div class="search-panel__empty">Ничего не найдено</div>`
+      : "";
+    return;
+  }
+
+  searchResults.innerHTML = data.results
+    .map(
+      (p) => `
+    <div class="search-result" data-sku="${p.sku}">
+      <span class="search-result__name">${p.name}</span>
+      <span class="search-result__price">${p.price} ₽</span>
+    </div>
+  `
+    )
+    .join("");
+}
+
+function scheduleSearch() {
+  const query = searchInput.value.trim();
+  updateUrlFromSearch(query, activeType);
+
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => runSearch(query, activeType), 150);
+}
+
+searchInput.addEventListener("input", scheduleSearch);
+searchInput.addEventListener("focus", () => searchPanel.classList.remove("hidden"));
+
+searchFilters.addEventListener("click", (e) => {
+  const btn = e.target.closest(".search-filter");
+  if (!btn) return;
+  activeType = btn.dataset.type;
+  [...searchFilters.children].forEach((c) => c.classList.toggle("search-filter--active", c === btn));
+  scheduleSearch();
+});
+
+// Клик по результату — эти записи синтетические, у них нет ни
+// остатка, ни пула ключей, поэтому реальный заказ на них не создать —
+// честно предупреждаем об этом, а не пытаемся вызвать handleBuyClick
+searchResults.addEventListener("click", (e) => {
+  const item = e.target.closest(".search-result");
+  if (!item) return;
+  const name = item.querySelector(".search-result__name").textContent;
+  alert(`«${name}» — демонстрационная запись из синтетического каталога (для проверки скорости поиска). Реальной покупки для неё нет — попробуйте один из товаров в разделе «Популярные товары» ниже.`);
+});
+
+// Открытая панель закрывается кликом вне неё
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".header__search")) {
+    searchPanel.classList.add("hidden");
+  }
+});
+document.getElementById("searchPanel").addEventListener("click", (e) => e.stopPropagation());
+searchInput.addEventListener("click", (e) => e.stopPropagation());
+
+// При загрузке страницы — если в URL уже есть ?q=... и/или ?type=...
+// (прямая ссылка на результат поиска), сразу восстанавливаем это состояние
+(function initSearchFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get("q") || "";
+  const type = params.get("type") || "";
+
+  if (q || type) {
+    searchInput.value = q;
+    activeType = type;
+    [...searchFilters.children].forEach((c) => c.classList.toggle("search-filter--active", c.dataset.type === type));
+    searchPanel.classList.remove("hidden");
+    runSearch(q, type);
+  } else {
+    searchFilters.children[0].classList.add("search-filter--active");
+  }
+})();
 
 // Делегирование событий: один обработчик на весь grid карточек товара
 document.getElementById("productsGrid").addEventListener("click", (e) => {
@@ -398,8 +519,7 @@ function connectRealtime() {
   };
 }
 
-// Точечно обновляет ТОЛЬКО тот товар, что реально изменился — не считая
-// полного ресинка при переподключении, это единственный путь обновления UI
+// Точечно обновляет ТОЛЬКО тот товар, что реально изменился
 function applyProductUpdate(updatedProduct) {
   const idx = currentProducts.findIndex((p) => p.sku === updatedProduct.sku);
   if (idx !== -1) {
@@ -413,7 +533,6 @@ function applyProductUpdate(updatedProduct) {
   }
 }
 
-// Блок "Пополнение Steam" — отдельная разметка (не карточка из грида)
 function updateTopupUI(product) {
   document.getElementById("topupAmount").textContent = product.price + " ₽";
   const btn = document.getElementById("topupBuyBtn");

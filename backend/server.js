@@ -7,6 +7,7 @@ const ordersRouter = require("./routes/orders");
 const webhookRouter = require("./routes/webhook");
 const paymentSimRouter = require("./routes/paymentSim");
 const adminRouter = require("./routes/admin");
+const searchRouter = require("./routes/search");
 const { initRealtime } = require("./services/realtime");
 const { startReservationSweeper } = require("./services/reservationSweeper");
 
@@ -26,6 +27,7 @@ app.get("/health", (req, res) => {
 app.use("/api", productsRouter);
 app.use("/api", ordersRouter);
 app.use("/api", paymentSimRouter);
+app.use("/api", searchRouter);
 app.use("/webhook", webhookRouter);
 app.use("/api/admin", adminRouter);
 
